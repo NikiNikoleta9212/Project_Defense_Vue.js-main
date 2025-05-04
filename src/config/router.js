@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import About from '../pages/About.vue';
+import Cart from '../pages/Cart.vue';
 import Contacts from '../pages/Contacts.vue';
 import Details from '../pages/Details.vue';
 import Favorite from '../pages/Favorite.vue';
@@ -17,6 +18,7 @@ const routes = [
   { path: '/login', name: 'login', component: Login },
   { path: '/register', name: 'register', component: Register },
   { path: '/products', name: 'products', component: Products },
+  { path: '/cart', name: 'cart', component: Cart },
   { path: '/details/:id', name: 'details', component: Details },
   { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound },
 ];

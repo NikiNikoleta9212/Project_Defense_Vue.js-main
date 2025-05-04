@@ -1,129 +1,103 @@
-<script>
-import { useAuthStore } from '@/stores/auth'; // Import auth store
-import { useDetailsStore } from '@/stores/useDetailsStore'; // Details store
-import { useFavoriteStore } from '@/stores/useFavoriteStore'; // Favorite store
+<script setup>
+import { useAuthStore } from '@/stores/auth';
+import { useCartStore } from '@/stores/cartStore'; // Import cart store
+import { useDetailsStore } from '@/stores/useDetailsStore';
+import { useFavoriteStore } from '@/stores/useFavoriteStore';
 import axios from 'axios';
 import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router'; // Import router for navigation
+import { useRouter } from 'vue-router';
 
-export default {
-  name: 'ProductList',
-  setup() {
-    // Reactive state
-    const products = ref([]);
-    const currentPage = ref(1);
-    const itemsPerPage = 4;
-    const isLoading = ref(false);
+const products = ref([]);
+const currentPage = ref(1);
+const itemsPerPage = 4;
+const isLoading = ref(false);
 
-    // Use stores
-    const favoriteStore = useFavoriteStore();
-    const authStore = useAuthStore();
-    const detailsStore = useDetailsStore();
-    const router = useRouter(); // Access Vue Router
+// Store usage
+const authStore = useAuthStore();
+const detailsStore = useDetailsStore();
+const favoriteStore = useFavoriteStore();
+const cartStore = useCartStore(); // Access the cart store
+const router = useRouter();
 
-    // Computed properties
-    const totalPages = computed(() => Math.ceil(products.value.length / itemsPerPage));
-    const paginatedProducts = computed(() => {
-      const start = (currentPage.value - 1) * itemsPerPage;
-      const end = start + itemsPerPage;
-      return products.value.slice(start, end);
-    });
+// Pagination
+const totalPages = computed(() => Math.ceil(products.value.length / itemsPerPage));
+const paginatedProducts = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  return products.value.slice(start, end);
+});
 
-    // Favorite functionality
-    const toggleFavorite = (product) => {
-      return favoriteStore.toggleFavorite(product);
-    };
+// Product actions
+async function fetchProducts() {
+  isLoading.value = true;
+  try {
+    const response = await axios.get('https://fakestoreapi.com/products');
+    products.value = response.data;
+  }
+  catch (error) {
+    console.error('Failed to fetch products:', error);
+  }
+  finally {
+    isLoading.value = false;
+  }
+}
 
-    const isFavorite = (product) => {
-      return favoriteStore.isFavorite(product);
-    };
+function toggleFavorite(product) {
+  favoriteStore.toggleFavorite(product);
+}
 
-    const removeFavorite = (product) => {
-      favoriteStore.removeFavorite(product);
-    };
+const isFavorite = product => favoriteStore.isFavorite(product);
 
-    // Set product details and redirect
-    const viewDetails = (product) => {
-      detailsStore.setProduct(product); // Set the selected product in the details store
-      router.push(`/details/${product.id}`); // Navigate to the Details page
-    };
+function removeFavorite(product) {
+  favoriteStore.removeFavorite(product);
+}
 
-    // Fetch products
-    const fetchProducts = async () => {
-      isLoading.value = true;
-      try {
-        const response = await axios.get('https://fakestoreapi.com/products');
-        products.value = response.data;
-      }
-      catch (error) {
-        console.error('Failed to fetch products:', error);
-      }
-      finally {
-        isLoading.value = false;
-      }
-    };
+function viewDetails(product) {
+  detailsStore.setProduct(product);
+  router.push(`/details/${product.id}`);
+}
 
-    const scrollToTop = () => {
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth',
-      });
-    };
+// ✅ Add to Cart action
+function addProduct(product) {
+  cartStore.addToCart(product); // Add the product to the cart store
+}
 
-    // Pagination controls
-    const nextPage = () => {
-      if (currentPage.value < totalPages.value) {
-        currentPage.value++;
-        scrollToTop();
-      }
-    };
+// Pagination controls
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-    const previousPage = () => {
-      if (currentPage.value > 1) {
-        currentPage.value--;
-        scrollToTop();
-      }
-    };
+function nextPage() {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+    scrollToTop();
+  }
+}
 
-    // Fetch products on component mount
-    onMounted(fetchProducts);
+function previousPage() {
+  if (currentPage.value > 1) {
+    currentPage.value--;
+    scrollToTop();
+  }
+}
 
-    return {
-      products,
-      currentPage,
-      itemsPerPage,
-      isLoading,
-      totalPages,
-      paginatedProducts,
-      toggleFavorite,
-      isFavorite,
-      removeFavorite,
-      viewDetails,
-      nextPage,
-      previousPage,
-      isLoggedIn: authStore.isLoggedIn,
-    };
-  },
-};
+// Lifecycle
+onMounted(fetchProducts);
+
+// Auth
+const isLoggedIn = computed(() => authStore.isLoggedIn);
 </script>
 
 <template>
   <progress v-if="isLoading" class="loader-line" />
+
   <div class="products">
     <h1>Products</h1>
     <ul class="product-list">
-      <li
-        v-for="product in paginatedProducts"
-        :key="product.id"
-        class="product-item"
-      >
+      <li v-for="product in paginatedProducts" :key="product.id" class="product-item">
         <article class="product-card">
           <div class="product-image-container">
-            <img
-              :src="product.image"
-              :alt="product.title"
-              class="product-image"
-            >
+            <img :src="product.image" :alt="product.title" class="product-image">
           </div>
           <div class="product-details">
             <h2 class="product-name">
@@ -134,91 +108,63 @@ export default {
             $ {{ product.price }}
           </p>
           <div class="btn">
-            <!-- Conditionally Render Buttons -->
             <button
               v-if="isLoggedIn"
               class="favorite-button"
               :class="{ 'favorite-active': isFavorite(product) }"
+              type="button"
               @click="isFavorite(product) ? removeFavorite(product) : toggleFavorite(product)"
             >
-              <i
-                :class="isFavorite(product) ? 'bi bi-x-circle' : 'bi bi-star'"
-              />
+              <i :class="isFavorite(product) ? 'bi bi-x-circle' : 'bi bi-star'" />
               {{ isFavorite(product) ? 'Remove' : 'Favorite' }}
             </button>
+
             <button
               v-else
               class="details-button"
+              type="button"
               @click="viewDetails(product)"
             >
               <i class="bi bi-info-circle" />
               Details
             </button>
+
+            <!-- ✅ New Add to Cart Button -->
+            <button
+              class="add-button"
+              type="button"
+              @click="addProduct(product)"
+            >
+              <i class="bi bi-cart-plus" />
+              Add
+            </button>
           </div>
         </article>
       </li>
     </ul>
-    <div class="pagination">
-      <button :disabled="currentPage === 1" @click="previousPage">
-        Previous
-      </button>
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
-      <button :disabled="currentPage === totalPages" @click="nextPage">
-        Next
-      </button>
-    </div>
   </div>
+
+  <footer v-if="!isLoading && totalPages > 1" class="pagination-container">
+    <button class="pagination-button" :disabled="currentPage === 1" @click="previousPage">
+      Previous
+    </button>
+    <span class="pagination-info">Page {{ currentPage }} of {{ totalPages }}</span>
+    <button class="pagination-button" :disabled="currentPage === totalPages" @click="nextPage">
+      Next
+    </button>
+  </footer>
 </template>
 
-<style>
-.favorite-button {
-  background-color: #ddd;
-  color: #333;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.favorite-button.favorite-active {
-  background-color: #ffcc00;
-  color: #fff;
-}
-
-.favorite-button i {
-  margin-right: 5px;
-}
-.loader-line {
-  width: 100%;
-  height: 3px;
-  position: relative;
-  overflow: hidden;
-  background-color: #ddd;
-  margin: 0 auto;
-  border-radius: 20px;
-}
-
-.loader-line:before {
-  content: "";
-  position: absolute;
-  left: -50%;
-  height: 3px;
-  width: 40%;
-  background-color: #212020;
-  animation: lineAnim 1s linear infinite;
-  border-radius: 20px;
-}
+<style scoped>
 .products {
   max-width: 1200px;
   margin: 0 auto;
   padding-bottom: 80px;
   font-family: Arial, sans-serif;
   text-align: center;
-
 }
 
-h1{
+h1 {
   font-size: 2.5rem;
   margin-bottom: 120px;
   padding-bottom: 20px;
@@ -229,7 +175,7 @@ h1{
   list-style-type: none;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr); /* Four items per row */
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
 }
 
@@ -241,7 +187,7 @@ h1{
 .product-card {
   width: 100%;
   max-width: 280px;
-  height: 480px; /* Fixed height for uniformity */
+  min-height: 480px;
   border: 1px solid #ddd;
   border-radius: 10px;
   overflow: hidden;
@@ -249,8 +195,8 @@ h1{
   transition: transform 0.2s, box-shadow 0.2s;
   background-color: #fff;
   display: flex;
-  flex-direction: column; /* Vertical layout */
-  justify-content: space-between; /* Space out content */
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .product-card:hover {
@@ -261,7 +207,7 @@ h1{
 .product-image-container {
   background-color: #f9f9f9;
   padding: 10px;
-  height: 180px; /* Reduced height to fit other elements */
+  height: 180px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -276,7 +222,7 @@ h1{
 .product-details {
   padding: 10px;
   text-align: left;
-  flex-grow: 1; /* Ensures details expand to fill space */
+  flex-grow: 1;
 }
 
 .product-name {
@@ -287,74 +233,23 @@ h1{
   text-align: center;
 }
 
-.product-description {
-  font-size: 0.85rem;
-  color: #666;
-  line-height: 1.4;
-  height: 45px; /* Smaller height for truncated description */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 10px;
-  text-align: justify;
-}
-
 .product-price {
   font-size: 1rem;
   font-weight: bold;
   color: #007BFF;
   text-align: center;
-  margin-top: auto; /* Pushes the price to the bottom */
-  padding-bottom: 10px; /* Add space between price and bottom of the card */
+  margin-top: auto;
+  padding-bottom: 10px;
 }
 
-/* Pagination */
-.pagination {
+.btn {
   display: flex;
   justify-content: center;
-  align-items: center;
-  margin-top: 20px;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
-.pagination button {
-  background-color: #007BFF;
-  color: white;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 5px;
-  margin: 0 5px;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.pagination button:disabled {
-  background-color: #ddd;
-  cursor: not-allowed;
-}
-
-.pagination span {
-  font-size: 1rem;
-  margin: 0 10px;
-  color: #333;
-}
-
-/* Responsive Design */
-@media (max-width: 1024px) {
-  .product-list {
-    grid-template-columns: repeat(3, 1fr); /* Three items per row */
-  }
-}
-
-@media (max-width: 768px) {
-  .product-list {
-    grid-template-columns: repeat(2, 1fr); /* Two items per row */
-  }
-}
-
-@media (max-width: 480px) {
-  .product-list {
-    grid-template-columns: 1fr; /* One item per row */
-  }
-}
 .favorite-button {
   background-color: #ddd;
   color: #333;
@@ -384,7 +279,100 @@ h1{
   background-color: #0056b3;
 }
 
-.favorite-button i, .details-button i {
+.favorite-button i,
+.details-button i,
+.add-button i {
   margin-right: 5px;
+}
+
+.add-button {
+  background-color: #17a2b8;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-button:hover {
+  background-color: #138496;
+}
+
+.add-product-button-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.add-product-button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  font-size: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-product-button:hover {
+  background-color: #218838;
+}
+
+.add-product-button i {
+  margin-right: 8px;
+}
+
+/* Pagination */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+.pagination-button {
+  padding: 8px 16px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.pagination-button:disabled {
+  cursor: not-allowed;
+  color: #aaa;
+  border-color: #ddd;
+}
+.pagination-button:not(:disabled):hover {
+  background-color: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+.pagination-info {
+  font-size: 14px;
+  color: #555;
+}
+
+@media (max-width: 1024px) {
+.product-list {
+grid-template-columns: repeat(3, 1fr);
+}
+}
+
+@media (max-width: 768px) {
+.product-list {
+grid-template-columns: repeat(2, 1fr);
+}
+}
+
+@media (max-width: 480px) {
+.product-list {
+grid-template-columns: 1fr;
+}
 }
 </style>
